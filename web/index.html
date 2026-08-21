@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>吸烟检测两级管线 · 演示</title>
+<style>
+  :root { --bg:#101418; --panel:#1a2027; --line:#2a333d; --txt:#e8edf2; --dim:#8b98a5;
+          --red:#ff4d4f; --green:#52c41a; --amber:#faad14; --blue:#1677ff; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--txt); font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; }
+  header { display:flex; align-items:center; gap:14px; padding:14px 24px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { font-size:17px; font-weight:600; }
+  .live { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--red); }
+  .live i { width:8px; height:8px; border-radius:50%; background:var(--red); animation:p 1.2s infinite; }
+  @keyframes p { 50% { opacity:.3; } }
+  .switch { display:flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .switch button { background:transparent; color:var(--dim); border:none; padding:7px 16px;
+                   font-size:13px; cursor:pointer; }
+  .switch button.on { background:var(--blue); color:#fff; }
+  #btnRun { border:none; border-radius:8px; padding:8px 18px; font-size:13px; cursor:pointer;
+            background:var(--green); color:#fff; }
+  #btnRun.on { background:var(--red); }
+  #meta { margin-left:auto; font-size:12px; color:var(--dim); }
+  #rtspBar { display:none; padding:10px 24px; border-bottom:1px solid var(--line); gap:8px; align-items:center; }
+  #rtspBar.show { display:flex; }
+  #rtspUrl { flex:1; background:var(--panel); border:1px solid var(--line); color:var(--txt);
+             border-radius:6px; padding:7px 10px; font-size:13px; }
+  #rtspUrl option { background:var(--panel); color:var(--txt); }
+  #rtspBar button { background:var(--blue); border:none; color:#fff; border-radius:6px;
+                    padding:7px 14px; font-size:13px; cursor:pointer; }
+  #connBanner { display:none; margin:10px 24px 0; padding:8px 12px; border-radius:6px;
+                background:#3a2020; border:1px solid var(--red); color:#ffb3b3; font-size:13px; }
+  #connBanner.show { display:block; }
+  main { display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:16px 24px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .panel h2 { font-size:13px; font-weight:500; color:var(--dim); padding:10px 14px;
+              border-bottom:1px solid var(--line); }
+  .panel img { width:100%; display:block; background:#000; min-height:280px; object-fit:contain; }
+  #statusBar { font-size:13px; color:var(--dim); padding:0 24px 8px; }
+  #events { padding:0 24px 24px; }
+  #events .evhead { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  #events h3 { font-size:13px; color:var(--dim); font-weight:500; }
+  #filterBar { display:flex; gap:6px; }
+  .evright { display:flex; gap:10px; align-items:center; }
+  #llmSelect { background:var(--panel); border:1px solid var(--line); color:var(--txt);
+               border-radius:4px; padding:3px 8px; font-size:12px; }
+  #llmSelect option { background:var(--panel); color:var(--txt); }
+  .fbtn { background:var(--panel); border:1px solid var(--line); color:var(--dim); border-radius:4px;
+          padding:3px 10px; font-size:12px; cursor:pointer; }
+  .fbtn.on { background:var(--blue); border-color:var(--blue); color:#fff; }
+  #eventList { list-style:none; max-height:420px; overflow-y:auto; }
+  #eventList li { display:block; padding:8px 12px; border-left:3px solid var(--line);
+                  background:var(--panel); margin-bottom:6px; border-radius:0 6px 6px 0; font-size:13px; }
+  #eventList li.yes { border-left-color:var(--red); }
+  #eventList li.skip { border-left-color:var(--amber); }
+  #eventList li.no { border-left-color:var(--green); }
+  #eventList .rowhead { display:flex; justify-content:space-between; align-items:center;
+                        margin-bottom:8px; font-size:12px; color:var(--txt); }
+  #eventList .cols6 { display:grid; grid-template-columns:repeat(5, auto) 1fr;
+                      gap:12px; align-items:start; }
+  #eventList .tmimg { text-align:center; font-size:11px; color:var(--dim); }
+  #eventList .tmimg img { height:110px; width:auto; border-radius:4px;
+                          border:1px solid var(--line); cursor:zoom-in; display:block; }
+  #eventList .tmimg span { display:block; margin-top:4px; }
+  #eventList .noimg { display:block; height:110px; width:90px; border:1px dashed var(--line);
+                      border-radius:6px; color:var(--dim); font-style:normal; text-align:center;
+                      line-height:110px; font-size:11px; }
+  #eventList .txt { display:flex; flex-direction:column; gap:5px; min-width:0; }
+  #eventList .snippet { cursor:pointer; text-decoration:underline dotted; }
+  #eventList .dim { color:var(--dim); font-size:11px; }
+  .badge.no { background:var(--green); color:#111; }
+  .badge { padding:2px 10px; border-radius:4px; font-size:12px; white-space:nowrap; }
+  .badge.yes { background:var(--red); color:#fff; }
+  .badge.skip { background:var(--amber); color:#111; }
+  .badge.wait { background:var(--line); color:var(--dim); }
+  #textModal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:60;
+               flex-direction:column; align-items:center; justify-content:center; gap:12px; }
+  #textModal.show { display:flex; }
+  #textModal pre { max-width:80vw; max-height:52vh; overflow:auto; background:var(--panel);
+                   padding:16px; border-radius:8px; font-size:12px; white-space:pre-wrap; }
+  #tmImgs { display:flex; gap:12px; flex-wrap:wrap; max-width:92vw; justify-content:center; }
+  #tmImgs .tmimg { text-align:center; font-size:11px; color:var(--dim); }
+  #tmImgs img { height:150px; width:auto; border-radius:6px; border:1px solid var(--line); cursor:zoom-in; }
+  .panel img { cursor:zoom-in; }
+  #lightbox { display:none; position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:50;
+              flex-direction:column; align-items:center; justify-content:center; gap:12px; }
+  #lightbox.show { display:flex; }
+  #lightbox img { max-width:92vw; max-height:80vh; width:auto; min-height:0; object-fit:contain;
+                  border-radius:8px; background:#000; }
+  .lb-bar { display:flex; gap:10px; align-items:center; }
+  .lb-bar span { color:var(--txt); font-size:13px; }
+  .lb-bar button { background:var(--blue); border:none; color:#fff; border-radius:6px;
+                   padding:7px 14px; font-size:13px; cursor:pointer; }
+  #llmMeta { color:var(--dim); font-weight:400; margin-left:8px; }
+  .s-suspect { color:var(--amber); } .s-clear { color:var(--green); }
+</style>
+</head>
+<body>
+<header>
+  <h1>吸烟检测 · 四级自适应管线演示</h1>
+  <span class="live"><i></i>LIVE</span>
+  <div class="switch">
+    <button id="btnVideo" class="on" onclick="setMode('video')">测试视频</button>
+    <button id="btnRtsp" onclick="setMode('rtsp')">实时视频流</button>
+  </div>
+  <button id="btnRun" onclick="toggleRun()">开始检测</button>
+  <span id="meta">Stage1 YOLO26 人体 → Stage2 香烟 + 时序确认 → Stage3 姿态验证（YOLO26n-pose）→ Stage4 大模型复核</span>
+</header>
+<div id="rtspBar">
+  <select id="rtspUrl">
+    <option value="rtsp://user:pass@192.168.1.100:554/Streaming/Channels/101">示例摄像头 1</option>
+    <option value="rtsp://user:pass@192.168.1.101:554/Streaming/Channels/101">示例摄像头 2</option>
+    <option value="rtsp://user:pass@192.168.1.102:554/Streaming/Channels/101">示例摄像头 3</option>
+    <option value="rtsp://user:pass@192.168.1.103:554/Streaming/Channels/101">示例摄像头 4</option>
+  </select>
+  <button onclick="connectRtsp()">连接</button>
+</div>
+<div id="connBanner"></div>
+<main>
+  <section class="panel">
+    <h2 id="tLeft">输入视频（原始）</h2>
+    <img id="imgSrc" alt="original">
+  </section>
+  <section class="panel">
+    <h2 id="tRight">检测结果（标注）</h2>
+    <img id="imgAnn" alt="annotated">
+  </section>
+</main>
+<div id="statusBar">当前状态：加载中…</div>
+<section id="events">
+  <div class="evhead">
+    <h3>吸烟复核记录<span id="llmMeta"></span></h3>
+    <div class="evright">
+    <select id="llmSelect" title="大模型复核模型">
+      <option value="qwen3-vl-plus">qwen3-vl-plus</option>
+      <option value="qwen3.8-max">qwen3.8-max</option>
+      <option value="qwen3.7-plus">qwen3.7-plus</option>
+      <option value="qwen3-vl-max">qwen3-vl-max</option>
+      <option value="qwen-vl-max">qwen-vl-max</option>
+    </select>
+    <div id="filterBar">
+      <button class="fbtn on" data-f="all">全部</button>
+      <button class="fbtn" data-f="yes">吸烟</button>
+      <button class="fbtn" data-f="no">无吸烟</button>
+      <button class="fbtn" data-f="pose">姿态排除</button>
+      <button class="fbtn" data-f="cool">冷却跳过</button>
+      <button class="fbtn" data-f="final">终审</button>
+    </div>
+    </div>
+  </div>
+  <ul id="eventList"></ul>
+</section>
+<div id="lightbox">
+  <div class="lb-bar">
+    <span id="lbTitle"></span>
+    <button id="lbCopy" onclick="copyLB()">复制图片</button>
+    <button onclick="closeLB()">关闭</button>
+  </div>
+  <img id="lbImg" alt="">
+</div>
+<div id="textModal">
+  <div class="lb-bar">
+    <span id="tmTitle"></span>
+    <button onclick="closeTM()">关闭</button>
+  </div>
+  <div id="tmImgs"></div>
+  <pre id="tmBody"></pre>
+</div>
+<script>
+let curMode = 'video';
+let running = false;
+let curFilter = 'all';
+function ecat(e) {
+  const l = e.llm;
+  if (!l) return 'wait';
+  if (l.skipped && l.pose_reject) return 'pose';
+  if (l.skipped) return 'cool';
+  if (l.verdict === true) return 'yes';
+  if (l.verdict === false) return 'no';
+  return 'wait';
+}
+document.getElementById('llmSelect').addEventListener('change', async e => {
+  await fetch('/api/llm', { method:'POST', headers:{'Content-Type':'application/json'},
+                          body: JSON.stringify({ model: e.target.value }) });
+});
+document.getElementById('filterBar').addEventListener('click', ev => {
+  const b = ev.target.closest('.fbtn');
+  if (!b) return;
+  curFilter = b.dataset.f;
+  document.querySelectorAll('.fbtn').forEach(x => x.classList.toggle('on', x === b));
+});
+async function toggleRun() {
+  const r = await fetch('/api/run', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ running: !running }) });
+  running = (await r.json()).running;
+  const br = document.getElementById('btnRun');
+  br.textContent = running ? '停止检测' : '开始检测';
+  br.classList.toggle('on', running);
+}
+async function setMode(mode) {
+  curMode = mode;
+  document.getElementById('btnVideo').classList.toggle('on', mode === 'video');
+  document.getElementById('btnRtsp').classList.toggle('on', mode === 'rtsp');
+  document.getElementById('rtspBar').classList.toggle('show', mode === 'rtsp');
+  const body = { mode };
+  if (mode === 'rtsp') body.rtsp_url = document.getElementById('rtspUrl').value;
+  await fetch('/api/mode', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+}
+function connectRtsp() { setMode('rtsp'); }
+async function poll() {
+  try {
+    const r = await fetch('/api/state');
+    const s = await r.json();
+    running = !!s.running;
+    const br = document.getElementById('btnRun');
+    br.textContent = running ? '停止检测' : '开始检测';
+    br.classList.toggle('on', running);
+    if (s.mode !== curMode) {  // server-side mode changed elsewhere; sync UI
+      curMode = s.mode;
+      document.getElementById('btnVideo').classList.toggle('on', s.mode === 'video');
+      document.getElementById('btnRtsp').classList.toggle('on', s.mode === 'rtsp');
+      document.getElementById('rtspBar').classList.toggle('show', s.mode === 'rtsp');
+    }
+    const live = s.mode === 'rtsp';
+    document.getElementById('tLeft').textContent  = live ? '实时视频流（原始）' : '输入视频（原始）';
+    document.getElementById('tRight').textContent = live ? '实时视频流（检测）' : '检测结果（标注）';
+    const banner = document.getElementById('connBanner');
+    if (live && s.source_status === 'error') {
+      banner.textContent = '实时流连接失败：请检查地址与摄像头账号密码（格式 rtsp://user:pass@IP:554/Streaming/Channels/101）';
+      banner.classList.add('show');
+    } else if (live && s.source_status !== 'ok') {
+      banner.textContent = '正在连接实时流…';
+      banner.classList.add('show');
+    } else banner.classList.remove('show');
+    const st = (s.statuses || []).map(t =>
+      `#${t.track} <b class="s-${t.status}">${t.status}</b>`).join('　') || '无人';
+    document.getElementById('statusBar').innerHTML =
+      `${running ? '' : '已停止 · '}源：${live ? 'RTSP 实时流' : '测试视频'} · 快照v3 · 帧 ${s.frame} · 源 ${Math.round(s.src_fps||0)} fps · ` +
+      `抽帧 ${s.analysis_fps} fps · 检测 ${(+s.fps).toFixed(1)} fps · 当前：${st}`;
+    const tk = s.llm_tokens || {};
+    const lsel = document.getElementById('llmSelect');
+    if (s.llm_model && lsel.value !== s.llm_model) lsel.value = s.llm_model;
+    document.getElementById('llmMeta').textContent = s.llm_enabled
+      ? ` · 大模型复核：${s.llm_model} · 调用 ${tk.calls || 0} 次 · 共 ${tk.total || 0} tokens（入 ${tk.prompt || 0} / 出 ${tk.completion || 0}）· 批量合并省 ${tk.merged || 0} 次 · 姿态排除 ${tk.pose_skip || 0} · 冷却跳过 ${tk.skipped || 0}`
+      : ' · 大模型复核未配置（llm_config.json）';
+    const ul = document.getElementById('eventList');
+    ul.innerHTML = (s.events || []).slice().reverse()
+      .filter(e => {
+        const c = ecat(e);
+        if (curFilter === 'all') return true;
+        if (curFilter === 'final') return c === 'yes' || c === 'no';
+        return c === curFilter;
+      }).map(e => {
+      const l = e.llm;
+      let badge, lic;
+      if (!l) { badge = '<span class="badge wait">复核中</span>'; lic = ''; }
+      else if (l.skipped && l.pose_reject) { badge = '<span class="badge skip">姿态排除</span>'; lic = 'skip'; }
+      else if (l.skipped) { badge = '<span class="badge wait">冷却跳过</span>'; lic = ''; }
+      else if (l.verdict === true) { badge = '<span class="badge yes">终审：吸烟</span>'; lic = 'yes'; }
+      else if (l.verdict === false) { badge = '<span class="badge no">终审：无吸烟</span>'; lic = 'no'; }
+      else { badge = '<span class="badge skip">调用失败 · 需人工复核</span>'; lic = 'skip'; }
+      const reason = l ? (l.reason || '') : '';
+      const snip = reason.length > 30 ? reason.slice(0, 30) + '…' : reason;
+      const full = l ? encodeURIComponent(JSON.stringify({reason: l.reason, raw: l.raw, prompt: l.prompt, latency: l.latency, model: l.model, tokens: l.tokens, batch: l.batch, skipped: l.skipped, pose_reject: l.pose_reject})) : '';
+      const evdata = encodeURIComponent(JSON.stringify({frame: e.frame, track: e.track, pose: e.pose, pose_detail: e.pose_detail, img_src: e.img_src, img_s1: e.img_s1, img_s2: e.img_s2, img_crop: e.img_crop, img_pose: e.img_pose, img_batch: l && l.img_batch}));
+      const poseTxt = e.pose === true ? '通过' : e.pose === false ? '排除' : '未判定（放行）';
+      return `<li class="${lic}">
+        <div class="rowhead"><span>帧 ${e.frame} · track #${e.track}</span>${badge}</div>
+        <div class="cols6">
+          <div class="tmimg">${e.img_src ? `<img src="/events/${e.img_src}" data-t="帧 ${e.frame} · CCTV 输入" alt="">` : '<i class="noimg">无图</i>'}<span>CCTV 输入</span></div>
+          <div class="tmimg">${e.img_s1 ? `<img src="/events/${e.img_s1}" data-t="帧 ${e.frame} · Stage1 人体检测" alt="">` : '<i class="noimg">无图</i>'}<span>Stage1 · 人体检测</span></div>
+          <div class="tmimg">${e.img_s2 ? `<img src="/events/${e.img_s2}" data-t="帧 ${e.frame} · Stage2 香烟检测" alt="">` : '<i class="noimg">无图</i>'}<span>Stage2 · 香烟检测</span></div>
+          <div class="tmimg">${e.img_pose ? `<img src="/events/${e.img_pose}" data-t="帧 ${e.frame} · 姿态检测" alt="">` : '<i class="noimg">无图</i>'}<span>Stage3 · 姿态检测</span></div>
+          <div class="tmimg">${(l && l.skipped) ? '<i class="noimg">未调用</i>' : ((l && l.img_batch) ? `<img src="/events/${l.img_batch}" data-t="帧 ${e.frame} · 大模型输入（合并 ${l.batch} 张）" alt="">` : (e.img_crop ? `<img src="/events/${e.img_crop}" data-t="帧 ${e.frame} · 大模型输入" alt="">` : '<i class="noimg">无图</i>'))}<span>${l && l.skipped ? 'Stage4 · 未调用' : `Stage4 · 大模型输入${l && l.batch > 1 ? `（合并${l.batch}张）` : ''}`}</span></div>
+          <div class="txt">
+            ${l ? `<span class="snippet" data-full="${full}" data-ev="${evdata}">${snip || '(无)'}（点击看完整）</span>
+              <span class="dim">Stage3 姿态：${poseTxt}${e.pose_detail ? ' · ' + e.pose_detail : ''}</span>
+              ${l.skipped ? `<span class="dim">Stage4 大模型：未调用（${l.pose_reject ? 'Stage3 姿态排除' : '冷却跳过'}）· 0 token</span>` : `<span class="dim">Stage4 大模型：耗时 ${l.latency}s · ${l.model}${l.tokens ? ` · ${l.tokens} tokens` : ''}</span>`}`
+            : '<span class="dim">等待大模型复核…</span>'}
+          </div>
+        </div></li>`;
+    }).join('') || '<li style="border-color:var(--line);color:var(--dim)">暂无事件</li>';
+  } catch (e) {}
+}
+function feed(id, url) {
+  const img = document.getElementById(id);
+  let busy = false;
+  async function tick() {
+    if (!running) { setTimeout(tick, 500); return; }
+    if (!busy) {
+      busy = true;
+      try {
+        const r = await fetch(url + '?t=' + Date.now(), { cache: 'no-store' });
+        if (r.status === 200) {
+          const blob = await r.blob();
+          const old = img.src;
+          img.src = URL.createObjectURL(blob);
+          if (old.startsWith('blob:')) URL.revokeObjectURL(old);
+        }
+      } catch (e) {}
+      busy = false;
+    }
+    setTimeout(tick, 200);
+  }
+  tick();
+}
+function openLB(src, title) {
+  document.getElementById('lbImg').src = src;
+  document.getElementById('lbTitle').textContent = title || '';
+  document.getElementById('lightbox').classList.add('show');
+}
+function closeLB() { document.getElementById('lightbox').classList.remove('show'); }
+async function copyLB() {
+  const btn = document.getElementById('lbCopy');
+  try {
+    const r = await fetch(document.getElementById('lbImg').src);
+    const blob = await r.blob();
+    const bmp = await createImageBitmap(blob);
+    const cv = document.createElement('canvas');
+    cv.width = bmp.width; cv.height = bmp.height;
+    cv.getContext('2d').drawImage(bmp, 0, 0);
+    const png = await new Promise(res => cv.toBlob(res, 'image/png'));
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+    btn.textContent = '已复制 ✓';
+  } catch (e) { btn.textContent = '复制失败'; }
+  setTimeout(() => { btn.textContent = '复制图片'; }, 1500);
+}
+document.getElementById('imgSrc').onclick = e => openLB(e.target.src, '输入帧（实时）');
+document.getElementById('imgAnn').onclick = e => openLB(e.target.src, '输出帧（实时）');
+function openTM(title, obj, ev) {
+  document.getElementById('tmTitle').textContent = title;
+  ev = ev || {};
+  const imgs = [];
+  const addImg = (name, cap) => { if (name) imgs.push(`<div class="tmimg"><img src="/events/${name}" data-t="帧 ${ev.frame} · ${cap}"><span>${cap}</span></div>`); };
+  addImg(ev.img_src, 'CCTV 输入');
+  addImg(ev.img_s1, 'Stage1 · 人体检测');
+  addImg(ev.img_s2, 'Stage2 · 香烟检测');
+  addImg(ev.img_pose, 'Stage3 · 姿态检测');
+  if (!obj.skipped) {
+    if (ev.img_batch) addImg(ev.img_batch, 'Stage4 · 大模型合并输入');
+    else addImg(ev.img_crop, 'Stage4 · 大模型输入');
+  }
+  document.getElementById('tmImgs').innerHTML = imgs.join('');
+  const parts = [];
+  if (ev.pose !== undefined && ev.pose !== null || ev.pose_detail) {
+    const pv = ev.pose === true ? '通过' : ev.pose === false ? '排除' : '未判定（放行）';
+    parts.push(`Stage3 姿态：${pv}${ev.pose_detail ? ' · ' + ev.pose_detail : ''}`);
+  }
+  if (obj.reason) parts.push(`${obj.skipped ? '排除原因' : '判定理由'}：${obj.reason}`);
+  if (obj.skipped) {
+    parts.push('Stage4 大模型：未调用，不消耗 token');
+  } else {
+    if (obj.latency !== undefined && obj.latency !== null) parts.push(`耗时：${obj.latency}s`);
+    if (obj.model) parts.push(`模型：${obj.model}`);
+    if (obj.tokens) parts.push(`消耗 tokens：${obj.tokens}${obj.batch > 1 ? `（批量 ${obj.batch} 张均摊）` : ''}`);
+    if (obj.raw) parts.push(`完整输出：\n${obj.raw}`);
+    if (obj.prompt) parts.push(`提示词：\n${obj.prompt}`);
+  }
+  document.getElementById('tmBody').textContent = parts.join('\n\n');
+  document.getElementById('textModal').classList.add('show');
+}
+function closeTM() { document.getElementById('textModal').classList.remove('show'); }
+document.getElementById('eventList').addEventListener('click', ev => {
+  const im = ev.target.closest('img');
+  if (im) { openLB(im.src, im.dataset.t || ''); return; }
+  const sn = ev.target.closest('.snippet');
+  if (sn) openTM('大模型复核详情', JSON.parse(decodeURIComponent(sn.dataset.full)),
+                   JSON.parse(decodeURIComponent(sn.dataset.ev || '%7B%7D')));
+});
+document.getElementById('textModal').addEventListener('click', e => {
+  if (e.target.id === 'textModal') closeTM();
+});
+document.getElementById('tmImgs').addEventListener('click', e => {
+  const im = e.target.closest('img');
+  if (im) openLB(im.src, im.dataset.t || '');
+});
+document.getElementById('lightbox').addEventListener('click', e => {
+  if (e.target.id === 'lightbox') closeLB();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLB(); });
+feed('imgSrc', '/snap/source');
+feed('imgAnn', '/snap/annotated');
+setInterval(poll, 1000); poll();
+</script>
+</body>
+</html>

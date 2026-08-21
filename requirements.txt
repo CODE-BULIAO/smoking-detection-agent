@@ -1,0 +1,5 @@
+ultralytics>=8.3
+opencv-python>=4.8
+numpy
+torch>=2.0
+# Intel 核显加速（可选）：openvino

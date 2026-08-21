@@ -1,0 +1,15 @@
+# 运行产物
+events/
+output/
+__pycache__/
+*.pyc
+.DS_Store
+
+# LLM 密钥（只提交模板 llm_config.json.example）
+llm_config.json
+
+# Office 临时锁文件
+~$*
+
+# PPT 演示文稿（大文件，不入库）
+*.pptx

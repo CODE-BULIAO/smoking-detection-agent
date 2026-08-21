@@ -1,0 +1,5 @@
+{
+  "base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+  "model": "qwen3.8-max",
+  "api_key": "填入你的 DASHSCOPE_API_KEY"
+}
